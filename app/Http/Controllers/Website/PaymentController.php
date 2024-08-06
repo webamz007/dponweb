@@ -12,8 +12,10 @@ use Illuminate\Http\Request;
 
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
+use Inertia\Inertia;
 use Ixudra\Curl\Facades\Curl;
 use Razorpay\Api\Api;
 
@@ -282,6 +284,75 @@ class PaymentController extends Controller
         }
 
         return response()->json($output);
+    }
+
+    // SBI Fast UPI Payment Integrations
+    public function fastUPICreateOrder(Request $request)
+    {
+        $randomOrderId = 'ORD' . time() . rand(100000, 999999);
+        $user = Auth::user();
+
+        $data = [
+            "token" => "7493ce-d99950-3cfb72-4a82a6-5c1170", // Replace with your API TOKEN
+            "order_id" => $randomOrderId,
+            "txn_amount" => $request->amount,
+            "txn_note" => 'Account Top Up',
+            "product_name" => "DP ON WEB",
+            "customer_name" => $user->name,
+            "customer_mobile" => '9011511707',
+            "customer_email" => $user->email,
+            "callback_url" => route('fastUPI.payment.callback')
+        ];
+
+        $response = Http::post('https://sbi.fastupi.io/order/create', $data);
+
+        if ($response->successful() && $response->json()['status'] == "true") {
+            return redirect($response->json()['results']['payment_url']);
+        }
+        $output = ['success' => false, 'msg' => $response->json()['message']];
+        return redirect()->back()->with('status', $output);
+    }
+
+    public function fastUPICallback(Request $request)
+    {
+        $data = [
+            "token" => "7493ce-d99950-3cfb72-4a82a6-5c1170", // Replace with your API TOKEN
+            "order_id" => $request->order_id
+        ];
+
+        $response = Http::post('https://sbi.fastupi.io/order/status', $data);
+        try {
+            DB::beginTransaction();
+
+            if ($response->successful() && $response->json()['status']) {
+                $user_id = Auth::id();
+                $transaction = new Transaction();
+                $transaction->user_id = $user_id;
+                $transaction->points = $request->amount;
+                $transaction->transaction_type = 'deposit';
+                $transaction->transaction_creator = 'user';
+                $transaction->status = 'complete';
+                $transaction->transaction_date = Carbon::now()->format('Y-m-d H:i:s');
+                $transaction->save();
+                if ($transaction) {
+                    $user = User::find($user_id);
+                    $user->points += $request->amount;
+                    $user->save();
+                    if ($user) {
+                        $output = ['success' => true, 'msg' => $response->json()['results']];
+                    } else {
+                        $output = ['success' => false, 'msg' => 'Something Went Wrong'];
+                    }
+                }
+            } else {
+                $output = ['success' => false, 'msg' => 'Something Went Wrong'];
+            }
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            $output = ['success' => false, 'msg' => $e->getMessage()];
+        }
+        return redirect()->route('home')->with('status', $output);
     }
 
     // Download APK

@@ -62,6 +62,10 @@ Route::any('pay-u-cancel',[PaymentController::class,'payUCancel'])->name('pay.u.
 Route::post('/create-order', [PaymentController::class, 'createOrder']);
 Route::post('/verify-payment', [PaymentController::class, 'verifyPayment']);
 
+// SBI Fast UPI Payment Routes
+Route::get('/sbi-fast-upi-create-order', [PaymentController::class, 'fastUPICreateOrder'])->name('fastUPI.payment.createOrder');
+Route::post('/callback', [PaymentController::class, 'fastUPICallback'])->name('fastUPI.payment.callback');
+
 Route::get('/download-apk', [PaymentController::class,'download']);
 
 

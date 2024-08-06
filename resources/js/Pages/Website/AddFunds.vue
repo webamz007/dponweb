@@ -23,7 +23,8 @@
                             <option value="phonepe">Pay Through PhonePe</option>
                             <option value="payu">Pay Through UMoney</option>
                             <option value="razorpay">Pay Through RazorPay</option>
-                            <option value="app">Pay Through App</option>
+<!--                            <option value="app">Pay Through App</option>-->
+                            <option value="fastUPI">Pay Through SBI Fast UPI</option>
                         </select>
                     </div>
                 </div>
@@ -31,6 +32,10 @@
             </div>
             <form :action="route('phonePe')" id="phonepe-form">
                 <input type="hidden" name="amount" :value="amount">
+            </form>
+            <form :action="route('fastUPI.payment.createOrder')" method="GET" id="fastUPI-form">
+                <input type="hidden" name="amount" :value="amount">
+                <input type="hidden" name="_token" :value="csrfToken">
             </form>
             <form :action="payUDetail.action" method="post" name="payuForm">
                 <input type="hidden" name="key" :value="payUDetail.key"/>
@@ -61,6 +66,7 @@ const props = defineProps({
 })
 const page = usePage();
 let amount = ref('');
+let csrfToken = ref('');
 let selected_payment_method = ref('default');
 let payUDetail = ref({
     action: '',
@@ -139,6 +145,10 @@ const requestInitiate = () => {
 
     } else if(selected_payment_method.value === 'phonepe') {
         document.getElementById("phonepe-form").submit();
+    } else if(selected_payment_method.value === 'fastUPI') {
+        let csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        csrfToken.value = csrf;
+        document.getElementById("fastUPI-form").submit();
     } else if(selected_payment_method.value === 'razorpay') {
         payWithRazorpay();
     } else if(selected_payment_method.value === 'app') {
