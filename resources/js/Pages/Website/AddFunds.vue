@@ -29,12 +29,8 @@
                 </div>
                 <button @click="requestInitiate" type="button" class="text-white bg-rk-red hover:bg-rk-blue-dark focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center">Pay Now</button>
             </div>
-            <form :action="route('phonePe')" id="phonepe-form">
+            <form method="GET" id="payment-form">
                 <input type="hidden" name="amount" :value="amount">
-            </form>
-            <form :action="route('fastUPI.payment.createOrder')" method="GET" id="fastUPI-form">
-                <input type="hidden" name="amount" :value="amount">
-                <input type="hidden" name="_token" :value="csrfToken">
             </form>
             <form :action="payUDetail.action" method="post" name="payuForm">
                 <input type="hidden" name="key" :value="payUDetail.key"/>
@@ -65,7 +61,6 @@ const props = defineProps({
 })
 const page = usePage();
 let amount = ref('');
-let csrfToken = ref('');
 let selected_payment_method = ref('default');
 let payUDetail = ref({
     action: '',
@@ -84,94 +79,67 @@ let payUDetail = ref({
 });
 
 const requestInitiate = () => {
+    const { value: paymentMethod } = selected_payment_method;
+    const { value: amt } = amount;
 
-    if (amount.value.length === 0 || amount.value < 1) {
-        iziToast.error({
-            title: 'Error',
-            message: 'Please Insert Amount',
-            position: 'topRight'
-        });
-        return;
+    if (!amt || amt < 1) {
+        return showToast('Error', "Please Insert Amount");
+    }
+    if (amt < 100) {
+        return showToast('Error', "Amount Can't Be Less Than 100");
     }
 
-    if (amount.value < 100) {
-        iziToast.error({
-            title: 'Error',
-            message: "Amount Can't Less Than 100",
-            position: 'topRight'
-        });
-        return;
+    switch (paymentMethod) {
+        case 'payu':
+            initiatePayU(amt);
+            break;
+        case 'phonepe':
+            submitForm(route('phonePe'));
+            break;
+        case 'fastUPI':
+            submitForm(route('fastUPI.payment.createOrder'));
+            break;
+        case 'razorpay':
+            payWithRazorpay();
+            break;
+        default:
+            showToast('Error', "Select Payment Method");
     }
+};
 
-    if (selected_payment_method.value === 'payu') {
+const submitForm = (action) => {
+    const form = document.getElementById('payment-form');
+    form.action = action;
+    form.submit();
+};
 
-        const formData = {
-            amount: parseInt(amount.value),
-        };
-        axios.post('payUMoney', formData)
-            .then(response => {
-                payUDetail.value = {
-                    action: response.data.action,
-                    key: response.data.merchant_key,
-                    hash: response.data.hash,
-                    txnid: response.data.txnid,
-                    firstname: response.data.name,
-                    email: response.data.email,
-                    phone: response.data.phone,
-                    productinfo: response.data.product_info,
-                    surl: response.data.successURL,
-                    furl: response.data.failURL,
-                    service_provider: response.data.service_provider,
-                    amount: response.data.amount,
-                    user_id: response.data.user_id,
-                };
-            })
-            .catch(error => {
-                iziToast.error({
-                    title: 'Error',
-                    message: error,
-                    position: 'topRight'
-                });
+const initiatePayU = (amt) => {
+    axios.post('payUMoney', { amount: parseInt(amt) })
+        .then(({ data }) => {
+            Object.assign(payUDetail.value, {
+                action: data.action,
+                key: data.merchant_key,
+                hash: data.hash,
+                txnid: data.txnid,
+                firstname: data.name,
+                email: data.email,
+                phone: data.phone,
+                productinfo: data.product_info,
+                surl: data.successURL,
+                furl: data.failURL,
+                service_provider: data.service_provider,
+                amount: data.amount,
+                user_id: data.user_id,
             });
-        setTimeout(function(){
-            document.forms.payuForm.submit();
-        }, 1000);
-
-    } else if(selected_payment_method.value === 'phonepe') {
-        document.getElementById("phonepe-form").submit();
-    } else if(selected_payment_method.value === 'fastUPI') {
-        let csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-        csrfToken.value = csrf;
-        document.getElementById("fastUPI-form").submit();
-    } else if(selected_payment_method.value === 'razorpay') {
-        payWithRazorpay();
-    } else {
-        iziToast.error({
-            title: 'Error',
-            message: 'Select Payment Method',
-            position: 'topRight'
-        });
-    }
-}
-
-const phonePe = () => {
-    axios.post('phonepe', {amount: amount.value})
-        .then(response => {
-
+            setTimeout(() => document.forms.payuForm.submit(), 1000);
         })
-        .catch(error => {
-            iziToast.error({
-                title: 'Error',
-                message: error,
-                position: 'topRight'
-            });
-        });
-}
+        .catch(error => showToast('Error', error.message || 'Error processing PayU'));
+};
 
 const payWithRazorpay = async () => {
     try {
-        const response = await axios.post('create-order', { amount: amount.value });
-        const { order_id } = response.data;
+        const { data } = await axios.post('create-order', { amount: amount.value });
+        const { order_id } = data;
 
         const options = {
             key: props.settings.razorpay_key_id,
@@ -179,50 +147,46 @@ const payWithRazorpay = async () => {
             currency: 'INR',
             name: 'DP ON WEB',
             description: 'Test Transaction',
-            order_id: order_id,
-            handler: async (response) => {
-                try {
-                    const res = await axios.post('verify-payment', {
-                        razorpay_order_id: response.razorpay_order_id,
-                        razorpay_payment_id: response.razorpay_payment_id,
-                        razorpay_signature: response.razorpay_signature,
-                        amount: amount.value * 100,
-                    });
-                    amount.value = '';
-                    Array.from(document.querySelectorAll('.wallet-points')).forEach(element => element.textContent = res.data.points);
-                    iziToast.success({
-                        title: 'Success',
-                        message: res.data.msg,
-                        position: 'topRight'
-                    });
-                } catch (error) {
-                    iziToast.error({
-                        title: 'Error',
-                        message: 'Payment verification failed',
-                        position: 'topRight'
-                    });
-                }
-            },
+            order_id,
+            handler: async (response) => handlePayment(response),
             prefill: {
                 name: page.props.auth.name,
                 email: page.props.auth.email,
                 contact: page.props.auth.phone,
             },
-            theme: {
-                color: '#3399cc',
-            },
+            theme: { color: '#3399cc' },
         };
 
-        const rzp = new Razorpay(options);
-        rzp.open();
+        new Razorpay(options).open();
     } catch (error) {
-        iziToast.error({
-            title: 'Error',
-            message: 'Error in creating order',
-            position: 'topRight'
-        });
+        showToast('Error', 'Error in creating order');
     }
-}
+};
+
+const handlePayment = async (response) => {
+    try {
+        const { data } = await axios.post('verify-payment', {
+            razorpay_order_id: response.razorpay_order_id,
+            razorpay_payment_id: response.razorpay_payment_id,
+            razorpay_signature: response.razorpay_signature,
+            amount: amount.value * 100,
+        });
+
+        updateWalletPoints(data.points);
+        amount.value = '';
+        showToast('Success', data.msg, 'success');
+    } catch (error) {
+        showToast('Error', 'Payment verification failed');
+    }
+};
+
+const updateWalletPoints = (points) => {
+    document.querySelectorAll('.wallet-points').forEach(element => element.textContent = points);
+};
+
+const showToast = (title, message, type = 'error') => {
+    iziToast[type]({ title, message, position: 'topRight' });
+};
 
 </script>
 
