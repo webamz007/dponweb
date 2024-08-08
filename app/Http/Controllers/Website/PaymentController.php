@@ -371,12 +371,4 @@ class PaymentController extends Controller
         }
         return redirect()->route('home')->with('status', $output);
     }
-
-    // Download APK
-    public function download()
-    {
-        $filePath = storage_path('app/public/dp-payment-app.apk');
-        return response()->download($filePath, 'dp-payment-app.apk', ['Content-Type' => 'application/vnd.android.package-archive']);
-
-    }
 }

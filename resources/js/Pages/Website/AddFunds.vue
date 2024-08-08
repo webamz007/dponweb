@@ -23,12 +23,11 @@
                             <option value="phonepe">Pay Through PhonePe</option>
                             <option value="payu">Pay Through UMoney</option>
                             <option value="razorpay">Pay Through RazorPay</option>
-<!--                            <option value="app">Pay Through App</option>-->
                             <option value="fastUPI">Pay Through SBI Fast UPI</option>
                         </select>
                     </div>
                 </div>
-                <button @click="requestInitiate" type="button" class="text-white bg-rk-red hover:bg-rk-blue-dark focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center">{{ btnText }}</button>
+                <button @click="requestInitiate" type="button" class="text-white bg-rk-red hover:bg-rk-blue-dark focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center">Pay Now</button>
             </div>
             <form :action="route('phonePe')" id="phonepe-form">
                 <input type="hidden" name="amount" :value="amount">
@@ -59,7 +58,7 @@
 import Layout from "@/Pages/Shared/Layout.vue";
 import {Head, usePage} from "@inertiajs/vue3";
 import axios from "axios";
-import {computed, defineProps, ref} from "vue";
+import {defineProps, ref} from "vue";
 
 const props = defineProps({
     settings: Object,
@@ -84,28 +83,24 @@ let payUDetail = ref({
     user_id: page.props.auth.user.id
 });
 
-const btnText = computed(() => {
-    return selected_payment_method.value === 'app' ? 'Download App' : 'Pay Now';
-})
-
 const requestInitiate = () => {
 
-    if ((amount.value.length === 0 || amount.value < 1) && selected_payment_method.value !== 'app') {
+    if (amount.value.length === 0 || amount.value < 1) {
         iziToast.error({
             title: 'Error',
             message: 'Please Insert Amount',
             position: 'topRight'
         });
-        return
+        return;
     }
 
-    if (( amount.value < 100) && selected_payment_method.value !== 'app') {
+    if (amount.value < 100) {
         iziToast.error({
             title: 'Error',
             message: "Amount Can't Less Than 100",
             position: 'topRight'
         });
-        return
+        return;
     }
 
     if (selected_payment_method.value === 'payu') {
@@ -138,7 +133,6 @@ const requestInitiate = () => {
                     position: 'topRight'
                 });
             });
-        // document.getElementById('amountInput').value = amount.value;
         setTimeout(function(){
             document.forms.payuForm.submit();
         }, 1000);
@@ -151,8 +145,6 @@ const requestInitiate = () => {
         document.getElementById("fastUPI-form").submit();
     } else if(selected_payment_method.value === 'razorpay') {
         payWithRazorpay();
-    } else if(selected_payment_method.value === 'app') {
-        handleDownload();
     } else {
         iziToast.error({
             title: 'Error',
@@ -230,34 +222,6 @@ const payWithRazorpay = async () => {
             position: 'topRight'
         });
     }
-}
-
-const handleDownload = () => {
-    if (isMobile()) {
-        checkAndOpenApp();
-    } else {
-        downloadApk();
-    }
-}
-
-const isMobile = () => {
-    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-}
-
-const checkAndOpenApp = () => {
-    window.location.href = 'mrsaifnetapp://'; // Replace with your app's scheme
-
-    // Set a timeout to check if the app was opened successfully.
-    setTimeout(() => {
-        if (!document.hidden) {
-            // App was not opened, trigger APK download.
-            downloadApk();
-        }
-    }, 2000); // 2 seconds
-}
-
-const downloadApk = () => {
-    window.location.href = '/download-apk';
 }
 
 </script>
