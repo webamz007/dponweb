@@ -307,8 +307,17 @@ class PaymentController extends Controller
         $response = Http::post('https://sbi.fastupi.io/order/create', $data);
 
         if ($response->successful() && $response->json()['status'] == "true") {
+            // Store the order ID and user ID in a database table
+            DB::table('payment_orders')->insert([
+                'order_id' => $randomOrderId,
+                'user_id' => $user->id,
+                'amount' => $request->amount,
+                'created_at' => now(),
+                'updated_at' => now()
+            ]);
             return redirect($response->json()['results']['payment_url']);
         }
+
         $output = ['success' => false, 'msg' => $response->json()['message']];
         return redirect()->back()->with('status', $output);
     }
@@ -325,10 +334,18 @@ class PaymentController extends Controller
             DB::beginTransaction();
 
             if ($response->successful() && $response->json()['status']) {
-                $user_id = Auth::id();
+                // Retrieve the user_id and amount using the order_id
+                $order = DB::table('payment_orders')->where('order_id', $request->order_id)->first();
+                if (!$order) {
+                    throw new \Exception('Order not found');
+                }
+
+                $user_id = $order->user_id;
+                $amount = $order->amount;
+
                 $transaction = new Transaction();
                 $transaction->user_id = $user_id;
-                $transaction->points = $request->amount;
+                $transaction->points = $amount;
                 $transaction->transaction_type = 'deposit';
                 $transaction->transaction_creator = 'user';
                 $transaction->status = 'complete';
@@ -336,10 +353,10 @@ class PaymentController extends Controller
                 $transaction->save();
                 if ($transaction) {
                     $user = User::find($user_id);
-                    $user->points += $request->amount;
+                    $user->points += $amount;
                     $user->save();
                     if ($user) {
-                        $output = ['success' => true, 'msg' => $response->json()['results']];
+                        $output = ['success' => true, 'msg' => 'Points Updated Successfully.'];
                     } else {
                         $output = ['success' => false, 'msg' => 'Something Went Wrong'];
                     }

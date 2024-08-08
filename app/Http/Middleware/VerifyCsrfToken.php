@@ -15,5 +15,6 @@ class VerifyCsrfToken extends Middleware
         '/payu-response',
         '/pay-u-cancel',
         '/phonepe-response',
+        '/callback',
     ];
 }
