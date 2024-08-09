@@ -20,10 +20,11 @@
                     <div class="flex justify-between items-center">
                         <select v-model="selected_payment_method" name="selected_payment_method" class="bg-rk-blue-dark text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
                             <option value="default">-- Select Payment Method --</option>
-                            <option value="phonepe">Pay Through PhonePe</option>
-                            <option value="payu">Pay Through UMoney</option>
-                            <option value="razorpay">Pay Through RazorPay</option>
-                            <option value="fastUPI">Pay Through SBI Fast UPI</option>
+                            <option v-if="$page.props.settings.isPhonePe" value="phonepe">Pay Through PhonePe</option>
+                            <option v-if="$page.props.settings.isUMoney" value="payu">Pay Through UMoney</option>
+                            <option v-if="$page.props.settings.isRazorPay" value="razorpay">Pay Through RazorPay</option>
+                            <option v-if="$page.props.settings.isFastUPI1" value="fastUPI1">Pay Through SBI Fast UPI 1</option>
+                            <option v-if="$page.props.settings.isFastUPI2" value="fastUPI2">Pay Through SBI Fast UPI 2</option>
                         </select>
                     </div>
                 </div>
@@ -96,8 +97,11 @@ const requestInitiate = () => {
         case 'phonepe':
             submitForm(route('phonePe'));
             break;
-        case 'fastUPI':
-            submitForm(route('fastUPI.payment.createOrder'));
+        case 'fastUPI1':
+            submitForm(route('fastUPI.payment.createOrder', { upi: 'UPI1' }));
+            break;
+        case 'fastUPI2':
+            submitForm(route('fastUPI.payment.createOrder', { upi: 'UPI2' }));
             break;
         case 'razorpay':
             payWithRazorpay();

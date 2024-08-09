@@ -289,57 +289,78 @@ class PaymentController extends Controller
     // SBI Fast UPI Payment Integrations
     public function fastUPICreateOrder(Request $request)
     {
-        $randomOrderId = 'ORD' . time() . rand(100000, 999999);
-        $user = Auth::user();
+        try {
+            $randomOrderId = 'ORD' . time() . rand(100000, 999999);
+            $user = Auth::user();
+            $setting = Setting::first();
+            $tokens = [
+                'UPI1' => $setting->fast_upi1_token,
+                'UPI2' => $setting->fast_upi2_token,
+            ];
+            $token = $tokens[$request->upi] ?? '';
 
-        $data = [
-            "token" => "7493ce-d99950-3cfb72-4a82a6-5c1170", // Replace with your API TOKEN
-            "order_id" => $randomOrderId,
-            "txn_amount" => $request->amount,
-            "txn_note" => 'Account Top Up',
-            "product_name" => "DP ON WEB",
-            "customer_name" => $user->name,
-            "customer_mobile" => '9011511707',
-            "customer_email" => $user->email,
-            "callback_url" => route('fastUPI.payment.callback')
-        ];
+            $data = [
+                "token" => $token,
+                "order_id" => $randomOrderId,
+                "txn_amount" => $request->amount,
+                "txn_note" => 'Account Top Up',
+                "product_name" => "DP ON WEB",
+                "customer_name" => $user->name,
+                "customer_mobile" => '9011511707',
+                "customer_email" => $user->email,
+                "callback_url" => route('fastUPI.payment.callback')
+            ];
 
-        $response = Http::post('https://sbi.fastupi.io/order/create', $data);
+            $response = Http::post('https://sbi.fastupi.io/order/create', $data);
 
-        if ($response->successful() && $response->json()['status'] == "true") {
-            // Store the order ID and user ID in a database table
-            DB::table('payment_orders')->insert([
-                'order_id' => $randomOrderId,
-                'user_id' => $user->id,
-                'amount' => $request->amount,
-                'created_at' => now(),
-                'updated_at' => now()
-            ]);
-            return redirect($response->json()['results']['payment_url']);
+            if ($response->successful() && $response->json()['status'] == "true") {
+                // Store the order ID and user ID in a database table
+                DB::table('payment_orders')->insert([
+                    'order_id' => $randomOrderId,
+                    'user_id' => $user->id,
+                    'amount' => $request->amount,
+                    'upi_type' => $request->upi,
+                    'created_at' => now(),
+                    'updated_at' => now()
+                ]);
+                return redirect($response->json()['results']['payment_url']);
+            } else {
+                throw new \Exception($response->json()['message']);
+            }
+        } catch (\Exception $e) {
+            $output = ['success' => false, 'msg' => 'Error: ' . $e->getMessage()];
+            return redirect()->back()->with('status', $output);
         }
-
-        $output = ['success' => false, 'msg' => $response->json()['message']];
-        return redirect()->back()->with('status', $output);
     }
 
     public function fastUPICallback(Request $request)
     {
-        $data = [
-            "token" => "7493ce-d99950-3cfb72-4a82a6-5c1170", // Replace with your API TOKEN
-            "order_id" => $request->order_id
-        ];
-
-        $response = Http::post('https://sbi.fastupi.io/order/status', $data);
         try {
+            // Retrieve the user_id and amount using the order_id
+            $order = DB::table('payment_orders')->where('order_id', $request->order_id)->first();
+            if (!$order) {
+                throw new \Exception('Order not found');
+            }
+
+            $upiType = $order->upi_type;
+
+            $setting = Setting::first();
+            $tokens = [
+                'UPI1' => $setting->fast_upi1_token,
+                'UPI2' => $setting->fast_upi2_token,
+            ];
+            $token = $tokens[$upiType] ?? '';
+
+            $data = [
+                "token" => $token,
+                "order_id" => $request->order_id,
+            ];
+
+            $response = Http::post('https://sbi.fastupi.io/order/status', $data);
+
             DB::beginTransaction();
 
             if ($response->successful() && $response->json()['status']) {
-                // Retrieve the user_id and amount using the order_id
-                $order = DB::table('payment_orders')->where('order_id', $request->order_id)->first();
-                if (!$order) {
-                    throw new \Exception('Order not found');
-                }
-
                 $user_id = $order->user_id;
                 $amount = $order->amount;
 
@@ -351,24 +372,25 @@ class PaymentController extends Controller
                 $transaction->status = 'complete';
                 $transaction->transaction_date = Carbon::now()->format('Y-m-d H:i:s');
                 $transaction->save();
+
                 if ($transaction) {
                     $user = User::find($user_id);
                     $user->points += $amount;
                     $user->save();
-                    if ($user) {
-                        $output = ['success' => true, 'msg' => 'Points Updated Successfully.'];
-                    } else {
-                        $output = ['success' => false, 'msg' => 'Something Went Wrong'];
-                    }
+                    $output = ['success' => true, 'msg' => 'Points Updated Successfully.'];
+                } else {
+                    $output = ['success' => false, 'msg' => 'Something Went Wrong'];
                 }
             } else {
                 $output = ['success' => false, 'msg' => 'Something Went Wrong'];
             }
+
             DB::commit();
         } catch (\Exception $e) {
             DB::rollBack();
             $output = ['success' => false, 'msg' => $e->getMessage()];
         }
+
         return redirect()->route('home')->with('status', $output);
     }
 }

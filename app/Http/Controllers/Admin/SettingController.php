@@ -98,9 +98,11 @@ class SettingController extends Controller
     }
     public function otherSettingUpdate(Request $request) {
         try {
-            $isUpi = ($request->isUpi) ? true : false;
             $isUMoney = ($request->isUMoney) ? true : false;
             $isPhonePe = ($request->isPhonePe) ? true : false;
+            $isFastUPI1 = ($request->isFastUPI1) ? true : false;
+            $isFastUPI2 = ($request->isFastUPI2) ? true : false;
+            $isRazorPay = ($request->isRazorPay) ? true : false;
             $setting = Setting::first();
             $setting->vpa = $request->vpa;
             $setting->name = $request->name;
@@ -113,12 +115,16 @@ class SettingController extends Controller
             $setting->phone = $request->phone;
             $setting->whatsapp = $request->whatsapp;
             $setting->phonepe_key = $request->phonepe_key;
-            $setting->isUpi = $isUpi;
             $setting->isUMoney = $isUMoney;
             $setting->isPhonePe = $isPhonePe;
+            $setting->isFastUPI1 = $isFastUPI1;
+            $setting->isFastUPI2 = $isFastUPI2;
+            $setting->isRazorPay = $isRazorPay;
             $setting->razorpay_key_id = $request->razorpay_key_id;
             $setting->razorpay_secret_key = $request->razorpay_secret_key;
             $setting->withdraw_limit = $request->withdraw_limit;
+            $setting->fast_upi1_token = $request->fast_upi1_token;
+            $setting->fast_upi2_token = $request->fast_upi2_token;
             $setting->save();
             if ($setting) {
                 $output = ['success' => true, 'msg' => 'Setting Updated!'];
