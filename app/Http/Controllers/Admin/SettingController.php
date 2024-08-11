@@ -103,6 +103,7 @@ class SettingController extends Controller
             $isFastUPI1 = ($request->isFastUPI1) ? true : false;
             $isFastUPI2 = ($request->isFastUPI2) ? true : false;
             $isRazorPay = ($request->isRazorPay) ? true : false;
+            $isFastUPIQR = ($request->isFastUPIQR) ? true : false;
             $setting = Setting::first();
             $setting->vpa = $request->vpa;
             $setting->name = $request->name;
@@ -120,11 +121,13 @@ class SettingController extends Controller
             $setting->isFastUPI1 = $isFastUPI1;
             $setting->isFastUPI2 = $isFastUPI2;
             $setting->isRazorPay = $isRazorPay;
+            $setting->isFastUPIQR = $isFastUPIQR;
             $setting->razorpay_key_id = $request->razorpay_key_id;
             $setting->razorpay_secret_key = $request->razorpay_secret_key;
             $setting->withdraw_limit = $request->withdraw_limit;
             $setting->fast_upi1_token = $request->fast_upi1_token;
             $setting->fast_upi2_token = $request->fast_upi2_token;
+            $setting->fast_upi_qr_token = $request->fast_upi_qr_token;
             $setting->save();
             if ($setting) {
                 $output = ['success' => true, 'msg' => 'Setting Updated!'];

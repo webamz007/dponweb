@@ -25,6 +25,7 @@
                             <option v-if="$page.props.settings.isRazorPay" value="razorpay">Pay Through RazorPay</option>
                             <option v-if="$page.props.settings.isFastUPI1" value="fastUPI1">Pay Through SBI Fast UPI 1</option>
                             <option v-if="$page.props.settings.isFastUPI2" value="fastUPI2">Pay Through SBI Fast UPI 2</option>
+                            <option v-if="$page.props.settings.isFastUPIQR" value="fastUPIQR">Pay Through Fast UPI QR</option>
                         </select>
                     </div>
                 </div>
@@ -102,6 +103,9 @@ const requestInitiate = () => {
             break;
         case 'fastUPI2':
             submitForm(route('fastUPI.payment.createOrder', { upi: 'UPI2' }));
+            break;
+        case 'fastUPIQR':
+            submitForm(route('fastUPIQR.payment.createOrder'));
             break;
         case 'razorpay':
             payWithRazorpay();

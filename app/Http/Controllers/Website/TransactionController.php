@@ -174,7 +174,7 @@ class TransactionController extends Controller
     }
 
     public function addFunds() {
-        $setting = Setting::select('isUMoney', 'isPhonePe', 'razorpay_key_id', 'isRazorPay', 'isFastUPI1', 'isFastUPI2')->first();
+        $setting = Setting::select('isUMoney', 'isPhonePe', 'razorpay_key_id', 'isRazorPay', 'isFastUPI1', 'isFastUPI2', 'isFastUPIQR')->first();
         return Inertia::render('Website/AddFunds', [
             'settings' => $setting
         ]);

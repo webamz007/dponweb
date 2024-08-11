@@ -306,7 +306,7 @@ class PaymentController extends Controller
                 "txn_note" => 'Account Top Up',
                 "product_name" => "DP ON WEB",
                 "customer_name" => $user->name,
-                "customer_mobile" => '9011511707',
+                "customer_mobile" => $user->phone,
                 "customer_email" => $user->email,
                 "callback_url" => route('fastUPI.payment.callback')
             ];
@@ -391,6 +391,99 @@ class PaymentController extends Controller
             $output = ['success' => false, 'msg' => $e->getMessage()];
         }
 
+        return redirect()->route('home')->with('status', $output);
+    }
+
+    // Fast UPI Payment Integrations For QR
+    public function createFastUPIOrderQR(Request $request)
+    {
+        try {
+            $randomOrderId = 'ORD' . time() . rand(100000, 999999);
+            $user = Auth::user();
+            $setting = Setting::first();
+            $callbackUrl = route('handleFastUPICallbackQR', ['order_id' => $randomOrderId]);
+            // Define the payload data
+            $response = Http::asForm()->post('https://fastupi.io/api/create-order', [
+                'customer_mobile' => $user->phone,
+                'user_token' => $setting->fast_upi_qr_token,
+                'amount' => $request->amount,
+                'order_id' => $randomOrderId,
+                'redirect_url' => $callbackUrl
+            ]);
+
+            // Check if the response is successful
+            if ($response->successful() && $response->json()['status'] === true) {
+                // Save the order details to the database
+                DB::table('payment_orders')->insert([
+                    'order_id' => $randomOrderId,
+                    'user_id' => $user->id,
+                    'amount' => $request->amount,
+                    'upi_type' => 'fastUPIQR',  // Store the payment method type
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                // Redirect to the payment URL
+                return redirect($response->json()['result']['payment_url']);
+            } else {
+                throw new \Exception($response->json()['msg']);
+            }
+        } catch (\Exception $e) {
+            $output = ['success' => false, 'msg' => 'Error: ' . $e->getMessage()];
+            return redirect()->back()->with('status', $output);
+        }
+    }
+
+    public function handleFastUPICallbackQR(Request $request)
+    {
+        try {
+            $order = DB::table('payment_orders')->where('order_id', $request->order_id)->first();
+            if (!$order) {
+                throw new \Exception('Order not found');
+            }
+
+            $setting = Setting::first();
+            $data = [
+                'user_token' => $setting->fast_upi_qr_token,  // Replace with your actual user token
+                'order_id' => $request->order_id,
+            ];
+
+            // Send the API request to check the order status
+            $response = Http::post('https://fastupi.io/api/check-order-status', $data);
+
+            DB::beginTransaction();
+            // Process the response
+            if ($response->successful() && $response->json()['status'] === 'COMPLETED') {
+
+                $user_id = $order->user_id;
+                $amount = $order->amount;
+
+                $transaction = new Transaction();
+                $transaction->user_id = $user_id;
+                $transaction->points = $amount;
+                $transaction->transaction_type = 'deposit';
+                $transaction->transaction_creator = 'user';
+                $transaction->status = 'complete';
+                $transaction->transaction_date = Carbon::now()->format('Y-m-d H:i:s');
+                $transaction->save();
+
+                if ($transaction) {
+                    $user = User::find($user_id);
+                    $user->points += $amount;
+                    $user->save();
+                    $output = ['success' => true, 'msg' => 'Points Updated Successfully.'];
+                } else {
+                    $output = ['success' => false, 'msg' => 'Something Went Wrong'];
+                }
+
+            } else {
+                throw new \Exception($response->json()['message']);
+            }
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            $output = ['success' => false, 'msg' => $e->getMessage()];
+        }
         return redirect()->route('home')->with('status', $output);
     }
 }

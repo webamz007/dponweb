@@ -95,16 +95,22 @@
                                         <input value="{{ $setting->razorpay_secret_key }}" type="text" name="razorpay_secret_key" class="form-control" id="razorpay_secret_key">
                                     </div>
                                 </div>
-                                <div class="col-md-6">
+                                <div class="col-md-4">
                                     <div class="form-group">
                                         <label for="fast_upi1_token">Fast UPI 1 Token</label>
                                         <input value="{{ $setting->fast_upi1_token }}" type="text" name="fast_upi1_token" class="form-control" id="fast_upi1_token">
                                     </div>
                                 </div>
-                                <div class="col-md-6">
+                                <div class="col-md-4">
                                     <div class="form-group">
                                         <label for="fast_upi2_token">Fast UPI 2 Token</label>
                                         <input value="{{ $setting->fast_upi2_token }}" type="text" name="fast_upi2_token" class="form-control" id="fast_upi2_token">
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-group">
+                                        <label for="fast_upi_qr_token">Fast UPI QR Token</label>
+                                        <input value="{{ $setting->fast_upi_qr_token }}" type="text" name="fast_upi_qr_token" class="form-control" id="fast_upi_qr_token">
                                     </div>
                                 </div>
                                 <div class="col-md-2">
@@ -148,6 +154,15 @@
                                         <div class="control-label">Fast UPI 2 Switch</div>
                                         <label class="custom-switch mt-2 pl-0">
                                             <input {{ ($setting->isFastUPI2) ? 'checked' : '' }} type="checkbox" name="isFastUPI2" class="custom-switch-input">
+                                            <span class="custom-switch-indicator"></span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="form-group">
+                                        <div class="control-label">Fast UPI QR Switch</div>
+                                        <label class="custom-switch mt-2 pl-0">
+                                            <input {{ ($setting->isFastUPIQR) ? 'checked' : '' }} type="checkbox" name="isFastUPIQR" class="custom-switch-input">
                                             <span class="custom-switch-indicator"></span>
                                         </label>
                                     </div>

@@ -66,6 +66,10 @@ Route::post('/verify-payment', [PaymentController::class, 'verifyPayment']);
 Route::get('/sbi-fast-upi-create-order/{upi}', [PaymentController::class, 'fastUPICreateOrder'])->name('fastUPI.payment.createOrder');
 Route::post('/callback', [PaymentController::class, 'fastUPICallback'])->name('fastUPI.payment.callback');
 
+// Fast UPI QR Payment Routes
+Route::get('/qr-payment/fast-upi/create-order', [PaymentController::class, 'createFastUPIOrderQR'])->name('fastUPIQR.payment.createOrder');
+Route::get('/qr-payment/fast-upi/callback', [PaymentController::class, 'handleFastUPICallbackQR'])->name('handleFastUPICallbackQR');
+
 Route::get('/create-storage-link', function () {
     Artisan::call('storage:link');
     Artisan::call('cache:clear');

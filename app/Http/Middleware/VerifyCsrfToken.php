@@ -16,5 +16,6 @@ class VerifyCsrfToken extends Middleware
         '/pay-u-cancel',
         '/phonepe-response',
         '/callback',
+        '/qr-payment/fast-upi/callback',
     ];
 }
