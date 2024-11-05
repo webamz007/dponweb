@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\NotificationController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\MarketController;
 use App\Http\Controllers\Api\PassbookController;
@@ -50,3 +51,9 @@ Route::post('add-funds', [TransactionController::class, 'addFunds']);
 // User Controller
 Route::post('profile', [UserController::class, 'myProfile']);
 Route::post('update-profile', [UserController::class, 'updateProfile']);
+
+// Regular user routes for web notifications
+Route::get('/notifications', [NotificationController::class, 'fetchNotifications']);
+Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
+Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllAsRead']);
+Route::post('/notifications/{id}/mark-read', [NotificationController::class, 'markAsRead']);

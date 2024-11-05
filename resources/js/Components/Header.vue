@@ -75,6 +75,88 @@
                     <span class="self-center text-2xl font-semibold whitespace-nowrap text-rk-yellow-light">DP WEB</span>
                 </Link>
                 <div class="flex items-center md:order-2">
+                    <!-- Notification Bell and Dropdown -->
+                    <div v-if="$page.props.auth.user" class="relative mr-3">
+                        <button type="button"
+                                class="flex text-sm rounded-full focus:ring-4 focus:ring-yellow-400 notification-bell"
+                                id="notification-menu-button"
+                                @click="fetchNotifications"
+                                aria-expanded="false"
+                                data-dropdown-toggle="notification-dropdown"
+                                data-dropdown-placement="bottom">
+                            <span class="sr-only">View notifications</span>
+                            <div class="relative">
+                                <i class="fas fa-bell text-2xl text-rk-yellow-light"></i>
+                                <div v-if="unreadCount > 0"
+                                     class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs animate-pulse">
+                                    {{ unreadCount }}
+                                </div>
+                            </div>
+                        </button>
+
+                        <!-- Notification Dropdown menu -->
+                        <div class="z-50 hidden text-base list-none rounded-lg shadow-lg"
+                             id="notification-dropdown">
+                            <div class="notification-container bg-gradient-to-b from-rk-blue-dark via-rk-blue to-rk-blue-dark rounded-lg overflow-hidden">
+                                <!-- Header -->
+                                <div class="px-4 py-3 bg-gradient-to-r from-rk-blue-dark to-rk-blue border-b border-rk-blue-light">
+                                    <div class="flex justify-between items-center">
+                                        <h3 class="font-semibold text-rk-yellow-light">Notifications</h3>
+                                        <button v-if="unreadCount > 0"
+                                                @click="markAllAsRead"
+                                                class="text-sm bg-rk-red hover:bg-red-600 text-white rounded-md px-3 py-1 transition duration-300 ease-in-out">
+                                            Mark all as read
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Loading State -->
+                                <div v-if="isLoading" class="p-4 text-center text-gray-400">
+                                    Loading notifications...
+                                </div>
+
+                                <!-- Error State -->
+                                <div v-else-if="error" class="p-4 text-center text-red-400">
+                                    {{ error }}
+                                </div>
+
+                                <!-- Empty State -->
+                                <div v-else-if="notifications.length === 0" class="p-4 text-center text-gray-400">
+                                    No notifications yet
+                                </div>
+
+                                <!-- Notifications List -->
+                                <div v-else class="divide-y divide-rk-blue-light max-h-[60vh] overflow-y-auto custom-scrollbar">
+                                    <div v-for="notification in notifications"
+                                         :key="notification.id"
+                                         @click="markAsRead(notification.id)"
+                                         class="flex px-4 py-3 hover:bg-rk-blue-dark/70 transition duration-300 ease-in-out cursor-pointer"
+                                         :class="{'bg-gradient-to-r from-rk-blue to-rk-blue-light/20': !notification.is_read,
+                                 'bg-gradient-to-r from-rk-blue-dark to-rk-blue': notification.is_read}">
+                                        <div class="flex-shrink-0 w-3">
+                                            <div class="h-2 w-2 rounded-full mt-2"
+                                                 :class="{'bg-rk-yellow-light': !notification.is_read,
+                                         'bg-gray-600': notification.is_read}">
+                                            </div>
+                                        </div>
+                                        <div class="w-full pl-3">
+                                            <div class="text-sm mb-1"
+                                                 :class="{'text-white font-semibold': !notification.is_read,
+                                         'text-gray-300': notification.is_read}">
+                                                {{ notification.title }}
+                                            </div>
+                                            <div class="text-xs text-gray-300 mb-1.5">
+                                                {{ notification.message }}
+                                            </div>
+                                            <div class="text-xs text-gray-400">
+                                                {{ formatTimestamp(notification.created_at) }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                     <button type="button"
                             class="flex mr-3 text-sm bg-gray-800 rounded-full md:mr-0 focus:ring-4 focus:ring-yellow-400"
                             id="user-menu-button" aria-expanded="false" data-dropdown-toggle="user-dropdown"
@@ -170,12 +252,92 @@
 
 <script setup>
 import { initFlowbite } from 'flowbite';
-import {Link} from "@inertiajs/vue3";
-import {onMounted} from "vue";
+import {Link, usePage} from "@inertiajs/vue3";
+import {ref, onMounted} from "vue";
+import axios from 'axios';
+
+// Reactive references
+const notifications = ref([]);
+const unreadCount = ref(0);
+const isLoading = ref(false);
+const error = ref(null);
+const user = usePage().props.auth.user;
+const user_id = user ? user.id : null;
 
 onMounted(() => {
     initFlowbite();
+    if (user_id) {
+        fetchUnreadCount();
+    }
 });
+
+// Function to fetch notifications
+const fetchNotifications = async () => {
+    try {
+        isLoading.value = true;
+        const response = await axios.get(`/api/notifications?user_id=${user_id}`);
+        notifications.value = response.data.notifications;
+    } catch (err) {
+        error.value = 'Failed to load notifications';
+        console.error('Error fetching notifications:', err);
+    } finally {
+        isLoading.value = false;
+    }
+};
+
+// Function to fetch unread count
+const fetchUnreadCount = async () => {
+    try {
+        const response = await axios.get(`/api/notifications/unread-count?user_id=${user_id}`);
+        unreadCount.value = response.data.count;
+    } catch (err) {
+        console.error('Error fetching unread count:', err);
+    }
+};
+
+// Function to mark all notifications as read
+const markAllAsRead = async () => {
+    try {
+        await axios.post('/api/notifications/mark-all-read', { user_id });
+        // Update the notifications to show they're read
+        notifications.value = notifications.value.map(notification => ({
+            ...notification,
+            is_read: 1
+        }));
+        unreadCount.value = 0;
+    } catch (err) {
+        console.error('Error marking notifications as read:', err);
+    }
+};
+
+// Function to mark single notification as read
+const markAsRead = async (notificationId) => {
+    try {
+        await axios.post(`/api/notifications/${notificationId}/mark-read`, { user_id });
+        // Update the specific notification
+        const notification = notifications.value.find(n => n.id === notificationId);
+        if (notification && !notification.is_read) {
+            notification.is_read = 1;
+            unreadCount.value--;
+        }
+    } catch (err) {
+        console.error('Error marking notification as read:', err);
+    }
+};
+
+// Format timestamp
+const formatTimestamp = (timestamp) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diff = Math.floor((now - date) / 1000); // difference in seconds
+
+    if (diff < 60) return 'Just now';
+    if (diff < 3600) return `${Math.floor(diff / 60)} minutes ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)} hours ago`;
+    if (diff < 2592000) return `${Math.floor(diff / 86400)} days ago`;
+
+    return date.toLocaleDateString();
+};
 
 
 </script>
@@ -185,5 +347,93 @@ onMounted(() => {
 .bg-nav {
     background-image: url('web-assets/img/other-nav-bg.png');
 }
+.notification-bell {
+    transition: transform 0.2s ease-in-out;
+}
 
+.notification-bell:hover {
+    transform: scale(1.1);
+}
+
+#notification-dropdown {
+    position: absolute;
+    right: 0;
+    min-width: 320px;
+    max-width: 400px;
+    margin-top: 0.5rem;
+}
+
+.notification-container {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+@media (max-width: 768px) {
+    #notification-dropdown {
+        position: fixed;
+        top: 60px;
+        left: 0;
+        right: 0;
+        width: 100%;
+        max-width: 100%;
+        margin: 0;
+        height: calc(100vh - 60px);
+        border-radius: 0;
+    }
+
+    .notification-container {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .notification-container > div:nth-child(2) {
+        flex-grow: 1;
+        max-height: none;
+    }
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.1);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+.animate-pulse {
+    animation: pulse 2s infinite;
+}
+
+.custom-scrollbar {
+    /* Firefox */
+    scrollbar-width: thin;
+    scrollbar-color: #fbbf24 rgba(30, 41, 59, 0.5);
+
+    /* Enable smooth scrolling */
+    scroll-behavior: smooth;
+}
+
+/* Webkit browsers */
+.custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: rgba(30, 41, 59, 0.5);
+    border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #fbbf24;
+    border-radius: 3px;
+    transition: background 0.2s ease;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #f59e0b;
+}
 </style>

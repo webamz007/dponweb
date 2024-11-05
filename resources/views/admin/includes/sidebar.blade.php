@@ -79,7 +79,24 @@
                     <li><a class="nav-link" href="{{ route('notice-board', ['type' => 'delhi']) }}">Delhi Board</a></li>
                 </ul>
             </li>
-{{--            @php--}}
+            <li class="dropdown">
+                <a href="#" class="menu-toggle nav-link has-dropdown">
+                    <i class="fas fa-bell"></i><span>Notifications</span>
+                </a>
+                <ul class="dropdown-menu">
+                    <li>
+                        <a class="nav-link" href="{{ route('admin.notifications.create') }}">
+                            Create Notification
+                        </a>
+                    </li>
+                    <li>
+                        <a class="nav-link" href="{{ route('admin.notifications.index') }}">
+                            All Notifications
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            {{--            @php--}}
 {{--                $status = \App\Models\Setting::first();--}}
 {{--                $status = $status->withdraw_status;--}}
 {{--            @endphp--}}

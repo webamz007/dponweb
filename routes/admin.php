@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\Auth\AuthController;
+use App\Http\Controllers\Admin\NotificationController;
 use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\TransactionController;
 use Illuminate\Support\Facades\Route;
@@ -99,6 +100,9 @@ Route::middleware('admin')->group(function (){
     Route::post('update-withdrawal-settings', [SettingController::class, 'updateWithdrawalSettings'])->name('update-withdrawal-settings');
     Route::get('notice-board/{type}', [SettingController::class, 'noticeBoard'])->name('notice-board')->where('type', 'other|starline|delhi');
     Route::post('update-notice-board', [SettingController::class, 'updateNoticeBoard'])->name('update-notice-board');
+
+    // Notification Route
+    Route::resource('notifications', NotificationController::class)->names('admin.notifications');
 });
 
 // Auth Routes
