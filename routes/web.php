@@ -76,6 +76,14 @@ Route::get('/create-storage-link', function () {
     return 'Storage link created!';
 });
 
+Route::get('/clear-cache', function () {
+    Artisan::call('config:clear');
+    Artisan::call('view:clear');
+    Artisan::call('route:clear');
+
+    return 'All caches cleared (config, view, route)';
+});
+
 require __DIR__.'/auth.php';
 
 

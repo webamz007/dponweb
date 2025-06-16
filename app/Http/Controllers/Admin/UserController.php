@@ -202,6 +202,7 @@ class UserController extends Controller
                     'users.id',
                     'users.name as user_name',
                     'markets.name as market_name',
+                    'markets.id as market_id',
                     'passbooks.number',
                     'passbooks.session',
                     'passbooks.token',
@@ -266,6 +267,8 @@ class UserController extends Controller
                             ->select(DB::raw('GROUP_CONCAT(CONCAT(number, " X ", play_points) SEPARATOR ", ") AS individualRecords'))
                             ->where('token', $row->token)
                             ->where('transaction_type', $row->transaction_type)
+                            ->where('user_id', $row->id)
+                            ->where('market_id', $row->market_id)
                             ->first();
 
                         $individualRecordsString = $individualRecords->individualRecords ?? '';
@@ -314,6 +317,7 @@ class UserController extends Controller
             $phone = request()->get('phone', null);
             $market = request()->get('market', null);
             $today = Carbon::now()->format('Y-m-d');
+            //$today = Carbon::createFromFormat('d-m-Y', '24-05-2025')->format('Y-m-d');
             $query = Bid::query()
                 ->select(
                     'users.name as user_name',
@@ -476,6 +480,7 @@ class UserController extends Controller
                 ->whereDate('passbooks.passbook_date', $date)
                 ->where('passbooks.transaction_type', 'win')
                 ->where('passbooks.session', $session)
+                ->where('passbooks.market_id', $market)
                 ->join('users', 'passbooks.user_id', 'users.id')
                 ->join('markets', 'passbooks.market_id', 'markets.id')
                 ->orderBy('passbooks.id', 'DESC');

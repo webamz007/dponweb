@@ -26,7 +26,7 @@ class HomeController extends Controller
         } else {
             $phone = 'guest';
         }
-        $day = strtolower(Carbon::now()->format('l'));
+        $day = strtolower(Carbon::now('Europe/London')->format('l'));
         $market_data = Helpers::getMarketData($day, $phone);
         $slides = Slide::where('type', 'other')->get();
         $notice_board = NoticeBoard::select('title', 'content')->where('market_type', 'other')->first();

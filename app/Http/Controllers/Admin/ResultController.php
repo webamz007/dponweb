@@ -25,6 +25,7 @@ class ResultController extends Controller
     }
     public function results($market_type, $builder) {
         if (request()->ajax()) {
+            $today = Carbon::now('Europe/London')->format('Y-m-d');
             $query = Result::query()
                 ->select(
                     'results.id',
@@ -36,13 +37,12 @@ class ResultController extends Controller
                     'results.digit3',
                     'results.result',
                 )
+                ->whereDate('result_date', $today)
                 ->join('markets', 'results.market_id', 'markets.id')
                 ->orderBy('results.id', 'DESC');
             if ($market_type == 'starline') {
                 $query->where('markets.market_type', $market_type);
             } else {
-                $today = Carbon::now('Europe/London')->format('Y-m-d');
-                $query->whereDate('result_date', $today);
                 $query->where('markets.market_type', 'other');
             }
             return DataTables::of($query->get())
@@ -108,6 +108,8 @@ class ResultController extends Controller
 
     public function getWinnersBids($id, $status = 'pending') {
         $today = Carbon::now()->format('Y-m-d');
+        //$today = Carbon::createFromFormat('d-m-Y', '24-05-2025')->format('Y-m-d');
+
         $result_data = Result::find($id);
         $market_type = Market::where('id', $result_data->market_id)->value('market_type');
         $session = $result_data->session;
@@ -135,7 +137,7 @@ class ResultController extends Controller
             ->join('markets', 'bids.market_id', 'markets.id')
             ->where('bids.market_id', $market_id)
             ->where('bids.status', 'pending')
-            ->where('bids.session', $session)
+//            ->where('bids.session', $session)
             ->whereDate('bids.bid_date', $today)
             ->when($status === 'complete', function ($query) {
                 return $query->where('bids.status', 'complete');
@@ -154,39 +156,42 @@ class ResultController extends Controller
                         ->orWhere('bids.number', $result);
                 });
             }
-            elseif ($market_type == 'starline' || $market_type == 'other')
-            {
-                $query->where(function ($q) use ($check, $result) {
-                $q->where('bids.number', $check)
-                    ->orWhere('bids.number', $result);
+            elseif ($market_type == 'starline' || $market_type == 'other') {
+                $query->where(function ($mainQuery) use ($check, $result, $session, $market_type, $today, $market_id) {
+                    // First normal OR logic
+                    $mainQuery->where(function ($q) use ($check, $result) {
+                        $q->where('bids.number', $check)
+                            ->orWhere('bids.number', $result);
+                    })
+                    ->where('bids.session', $session);
+
+                    // Add special close-session logic (inside same group)
+                    if ($session == 'close' && $market_type == 'other') {
+                        $open_session = Result::where('market_id', $market_id)
+                            ->whereDate('result_date', $today)
+                            ->where('session', 'open')
+                            ->first();
+
+                        if ($open_session) {
+                            $close_result = $result;
+                            $close_number = $check;
+                            $open_number = $open_session->digit1 . $open_session->digit2 . $open_session->digit3;
+                            $open_result = $open_session->result;
+                            $double_digit = $open_result . $close_result;
+                            $get_half1 = $open_number . '-' . $close_result;
+                            $get_half2 = $open_result . '-' . $close_number;
+                            $get_full = $open_number . '-' . $close_number;
+
+                            $mainQuery->orWhere(function ($q) use ($double_digit, $get_half1, $get_half2, $get_full) {
+                                $q->where('bids.number', $double_digit)
+                                    ->orWhere('bids.number', $get_half1)
+                                    ->orWhere('bids.number', $get_half2)
+                                    ->orWhere('bids.number', $get_full);
+                            });
+                        }
+                    }
                 });
-
             }
-
-        if ($session == 'close' && $market_type == 'other') {
-            $open_session = Result::where('market_id', $market_id)->whereDate('result_date', $today)->where('session', 'open')->first();
-            if ($open_session) {
-                $close_result = $result;
-                $close_number = $check;
-                $open_digit_1 = $open_session->digit1;
-                $open_digit_2 = $open_session->digit2;
-                $open_digit_3 = $open_session->digit3;
-                $open_number = $open_digit_1 . $open_digit_2 . $open_digit_3;
-                $open_result = $open_session->result;
-                $double_digit = $open_result . $close_result;
-                $get_half1 = $open_number . '-' . $close_result;
-                $get_half2 = $open_result . '-' . $close_number;
-                $get_full = $open_number . '-' . $close_number;
-
-                $query->orWhere(function ($q) use ($double_digit, $get_half1, $get_half2, $get_full) {
-                    $q->where('bids.number', $double_digit)
-                        ->orWhere('bids.number', $get_half1)
-                        ->orWhere('bids.number', $get_half2)
-                        ->orWhere('bids.number', $get_full);
-                });
-
-            }
-        }
 
         return $query;
     }
@@ -250,10 +255,17 @@ class ResultController extends Controller
         ]);
         return view('admin.pages.results.delhi-markets-result', compact('html'));
     }
+    public function timeToSeconds($timeString) {
+        [$h, $m, $s] = explode(':', $timeString);
+        return $h * 3600 + $m * 60 + $s;
+    }
     public function storeResult(Request $request) {
         try {
             $day = strtolower(Carbon::now()->format('l'));
+
             $currentTime = Carbon::now('Asia/Kolkata')->format('H:i:s');
+            $currentSeconds = $this->timeToSeconds($currentTime);
+
             $market_type = $request->market_type;
             $market_id = $request->market;
             $session = $request->status;
@@ -266,21 +278,29 @@ class ResultController extends Controller
             $oet = Carbon::parse($market->oet)->format('H:i:s');
             $cet = Carbon::parse($market->cet)->format('H:i:s');
             $ort = Carbon::parse($market->ort)->format('H:i:s');
+
+            $oetSeconds = $this->timeToSeconds($oet);
+            $cetSeconds = $this->timeToSeconds($cet);
+            $ortSeconds = $this->timeToSeconds($ort);
+
             if ($market->market_type == 'other' && $session == 'open') {
-                if ($currentTime < $oet) {
+                if ($currentSeconds < $oetSeconds) {
                     throw new \Exception("You can't add result for open before OET");
-                }
-                elseif ($currentTime > $cet) {
+                } elseif ($currentSeconds > $cetSeconds) {
                     throw new \Exception("You can just add result for open before CET");
                 }
-            }
-            else if ($market->market_type == 'other' && $session == 'close') {
-                if ($currentTime < $cet) {
+            } elseif ($market->market_type == 'other' && $session == 'close') {
+                // Get current date in Asia/Kolkata timezone
+                $currentDate = Carbon::now('Asia/Kolkata')->format('Y-m-d');
+                $resultDate = Carbon::parse($result_date)->format('Y-m-d');
+
+                $isCurrentDateGreater = $currentDate > $resultDate;
+
+                if (($currentSeconds < $cetSeconds) &&  ($isCurrentDateGreater == false)) {
                     throw new \Exception("You can't add result for close before CET");
                 }
-            }
-            else if ($market->market_type == 'starline') {
-                if ($currentTime < $ort) {
+            } elseif ($market->market_type == 'starline') {
+                if ($currentSeconds < $ortSeconds) {
                     throw new \Exception("You can't add result before ORT");
                 }
             }
@@ -318,6 +338,7 @@ class ResultController extends Controller
 
             $day = strtolower(Carbon::now()->format('l'));
             $currentTime = Carbon::now('Asia/Kolkata')->format('H:i:s');
+            $currentSeconds = $this->timeToSeconds($currentTime);
             $market_id = $request->market;
             $market = Market::select('markets.market_type', 'market_details.ort')
                 ->join('market_details', 'markets.id', 'market_details.market_id')
@@ -325,8 +346,9 @@ class ResultController extends Controller
                 ->where('market_details.day', $day)
                 ->first();
             $ort = Carbon::parse($market->ort)->format('H:i:s');
+            $ortSeconds = $this->timeToSeconds($ort);
             if ($market->market_type == 'delhi') {
-                if ($currentTime < $ort) {
+                if ($currentSeconds < $ortSeconds) {
                     throw new \Exception("You can't add result before BET");
                 }
             }

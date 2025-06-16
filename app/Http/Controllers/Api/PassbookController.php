@@ -39,6 +39,81 @@ class PassbookController extends Controller
         }
     }
 
+    public function gamePassbookData()
+    {
+        if (!request()->has('email')) {
+            return response()->json(['success' => false, 'msg' => 'Email Required.']);
+        }
+        $email = request()->input('email');
+        $user = User::where('email', $email)->first();
+
+        if (!$user) {
+            return response()->json(['success' => false, 'msg' => 'User Not Found.']);
+        }
+
+        // Query to get passbook data
+        $query = Passbook::query()
+            ->select(
+                'markets.name as market_name',
+                'passbooks.number',
+                'passbooks.session',
+                'passbooks.token',
+                'passbooks.transaction_type',
+                'passbooks.passbook_date',
+                'latest_passbooks.play_points',
+                'latest_passbooks.winning_points',
+                'passbooks.total_points'
+            )
+            ->where('passbooks.user_id', $user->id)
+            ->join('markets', 'passbooks.market_id', '=', 'markets.id')
+            ->groupBy('passbooks.token', 'passbooks.transaction_type');
+
+        // Subquery to get the latest passbooks.id for each group along with play_points and winning_points
+        $subquery = DB::table('passbooks')
+            ->select(
+                'token',
+                'transaction_type',
+                DB::raw('MAX(passbooks.id) as latest_passbook_id'),
+                DB::raw('SUM(passbooks.play_points) as play_points'),
+                DB::raw('SUM(passbooks.winning_points) as winning_points')
+            )
+            ->groupBy('token', 'transaction_type');
+
+        // Join with the subquery to get the corresponding row
+        $result = $query
+            ->joinSub($subquery, 'latest_passbooks', function ($join) {
+                $join->on('passbooks.id', '=', 'latest_passbooks.latest_passbook_id');
+            })
+            ->orderBy('passbooks.id', 'DESC')
+            ->get();
+
+        // Transform data for API response
+        $responseData = $result->map(function ($row) {
+            return [
+                'market_name' => $row->market_name,
+                'number' => $row->number,
+                'session' => $row->session,
+                'token' => $row->token,
+                'transaction_type' => $row->transaction_type == 'win' ? 'Winning' : 'Spent',
+                'passbook_date' => $row->passbook_date,
+                'total_points' => $row->total_points,
+                'points' => $row->transaction_type == 'win'
+                    ? "+{$row->winning_points}"
+                    : "-{$row->play_points}",
+                'result' => $row->transaction_type == 'win'
+                    ? DB::table('passbooks')
+                        ->select(DB::raw('GROUP_CONCAT(CONCAT(number, " X ", play_points) SEPARATOR ", ") AS individualRecords'))
+                        ->where('token', $row->token)
+                        ->where('transaction_type', $row->transaction_type)
+                        ->value('individualRecords')
+                    : '',
+            ];
+        });
+
+        return response()->json(['data' => $responseData], 200);
+    }
+
+
     function passResult($user, $token) {
         $results = DB::table('passbook')
             ->where('user', $user)

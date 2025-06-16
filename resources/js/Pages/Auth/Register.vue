@@ -1,9 +1,5 @@
 <script setup>
-import {auth} from "@/firebase-config";
-import { signInWithPhoneNumber, RecaptchaVerifier } from "firebase/auth";
-
 import {onMounted, ref} from "vue";
-
 import { VueTelInput } from 'vue-tel-input';
 import 'vue-tel-input/dist/vue-tel-input.css';
 import GuestLayout from '@/Layouts/GuestLayout.vue';
@@ -17,20 +13,20 @@ const otpCode = ref('');
 const showOtp = ref(false);
 const formErrors = ref('');
 const isProcessing = ref(false);
+const sessionId = ref(''); // To store 2factor.in session ID
 
 const bindProps = ref({
     mode: "international",
-        defaultCountry: "IN",
-        placeholder: "Enter a phone number",
-        required: true,
-        enabledCountryCode: true,
-        enabledFlags: true,
-        onlyCountries: ['IN', 'PK'],
-        autocomplete: "on",
-        name: "phone",
-        maxLen: 25,
-
-    });
+    defaultCountry: "IN",
+    placeholder: "Enter a phone number",
+    required: true,
+    enabledCountryCode: true,
+    enabledFlags: true,
+    onlyCountries: ['IN', 'PK'],
+    autocomplete: "on",
+    name: "phone",
+    maxLen: 25,
+});
 
 const form = useForm({
     name: '',
@@ -55,83 +51,102 @@ const submit = () => {
 };
 
 const checkRegisterData = async () => {
-
     isProcessing.value = true;
     var phoneFormat = form.phone;
     form.phone = form.phone.replace(/^\+\d+\s/g, '').replace(/\s/g, '');
-    let response = await axios.post(route('check-register-data'), form);
-    form.phone = phoneFormat;
-    if (response.data.success) {
-        onSendOtp();
-    }
-    else {
-        formErrors.value = response.data.msg;
-        isProcessing.value = false;
-    }
 
-};
-
-const onSendOtp = () => {
-    isProcessing.value = true;
-    const appVerifier = window.recaptchaVerifier
-    // var number = '+1 650-555-3434';
-    signInWithPhoneNumber(auth, form.phone, appVerifier).then(function (confirmationResult) {
-        window.confirmationResult = confirmationResult;
-        iziToast.success({
-            title: 'Success',
-            message: 'OTP sent successfully!',
-            position: 'topRight'
-        });
-        isProcessing.value = false;
-        showOtp.value = true;
-    }).catch(function (error) {
+    try {
+        let response = await axios.post(route('check-register-data'), form);
+        form.phone = phoneFormat;
+        if (response.data.success) {
+            onSendOtp();
+        } else {
+            formErrors.value = response.data.msg;
+            isProcessing.value = false;
+        }
+    } catch (error) {
         isProcessing.value = false;
         iziToast.error({
             title: 'Error',
-            message: error.message,
+            message: 'Something went wrong!',
             position: 'topRight'
         });
-    });
+    }
+};
+
+const onSendOtp = async () => {
+    isProcessing.value = true;
+
+    try {
+        // Call your Laravel backend endpoint that will interact with 2factor.in for call OTP
+        const response = await axios.post('/api/send-call-otp', {
+            phone: form.phone.replace(/^\+\d+\s/g, '').replace(/\s/g, '')
+        });
+
+        if (response.data.Status === 'Success') {
+            sessionId.value = response.data.Details; // Store the session ID
+            iziToast.success({
+                title: 'Success',
+                message: 'OTP call initiated successfully!',
+                position: 'topRight'
+            });
+            showOtp.value = true;
+        } else {
+            throw new Error(response.data.Details);
+        }
+    } catch (error) {
+        iziToast.error({
+            title: 'Error',
+            message: error.message || 'Failed to initiate OTP call',
+            position: 'topRight'
+        });
+    } finally {
+        isProcessing.value = false;
+    }
 }
 
-const onOtpVerify = () => {
-    let otp = otpCode.value;
-    if (otp.length !== 6) {
+const onOtpVerify = async () => {
+    if (otpCode.value.length !== 6) {
         iziToast.error({
             title: 'Error',
             message: 'Please enter 6 digit otp code.',
             position: 'topRight'
         });
-        return
+        return;
     }
-    // var code = 654321;
+
     isProcessing.value = true;
-    window.confirmationResult.confirm(otp).then(async (res) => {
-        iziToast.success({
-            title: 'Success',
-            message: 'Phone Number Verified Successfully!',
-            position: 'topRight'
+
+    try {
+        // Call your Laravel backend endpoint to verify OTP
+        const response = await axios.post('/api/verify-otp', {
+            session_id: sessionId.value,
+            otp: otpCode.value
         });
-        submit();
-    }).catch(function (error) {
-        isProcessing.value = false;
+
+        if (response.data.Status === 'Success') {
+            iziToast.success({
+                title: 'Success',
+                message: 'Phone Number Verified Successfully!',
+                position: 'topRight'
+            });
+            submit();
+        } else {
+            throw new Error(response.data.Details);
+        }
+    } catch (error) {
         iziToast.error({
             title: 'Error',
-            message: error.message,
+            message: error.message || 'Invalid OTP',
             position: 'topRight'
         });
-    });
+    } finally {
+        isProcessing.value = false;
+    }
 }
 
 onMounted(() => {
-    window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-        'size': 'invisible',
-        'callback': (response) => {},
-        'expired-callback': () => {}
-    });
-
     document.querySelector(".vti__input").required = true;
-
 })
 </script>
 
@@ -163,7 +178,7 @@ onMounted(() => {
                     Verify OTP
                 </button>
                 <p class="text-sm font-light text-gray-900 mt-2">
-                    Didn't get code? <a @click.prevent="onSendOtp" href="#" class="font-bold text-primary-600 hover:underline dark:text-primary-500">Send Again</a>
+                    Didn't receive the call? <a @click.prevent="onSendOtp" href="#" class="font-bold text-primary-600 hover:underline dark:text-primary-500">Call Again</a>
                 </p>
             </div>
         </div>

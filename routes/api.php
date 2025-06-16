@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\NotificationController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\MarketController;
+use App\Http\Controllers\Api\OTPController;
 use App\Http\Controllers\Api\PassbookController;
 use App\Http\Controllers\Api\SettingController;
 use App\Http\Controllers\Api\TransactionController;
@@ -38,6 +39,7 @@ Route::post('notice-boards', [SettingController::class, 'noticeBoard']);
 
 // Passbook Controller
 Route::post('passbook', [PassbookController::class, 'getPassbook']);
+Route::post('get-passbook', [PassbookController::class, 'gamePassbookData']);
 Route::post('market-results', [PassbookController::class, 'getResults']);
 
 // Transaction Controller
@@ -57,3 +59,7 @@ Route::get('/notifications', [NotificationController::class, 'fetchNotifications
 Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
 Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllAsRead']);
 Route::post('/notifications/{id}/mark-read', [NotificationController::class, 'markAsRead']);
+
+// Routes for verify phone number in register component using 2Factor.in
+Route::post('/send-call-otp', [OTPController::class, 'sendCallOTP']);
+Route::post('/verify-otp', [OTPController::class, 'verifyOTP']);

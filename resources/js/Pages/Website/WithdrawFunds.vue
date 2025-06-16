@@ -61,6 +61,15 @@ const withRequest = async () => {
         return;
     }
 
+    if ( amount.value < 500) {
+        iziToast.error({
+            title: 'Error',
+            message: 'You Can Withdraw Minimum Amount 500 ',
+            position: 'topRight'
+        });
+        return
+    }
+
     if ( amount.value > withdraw_limit) {
         iziToast.error({
             title: 'Error',

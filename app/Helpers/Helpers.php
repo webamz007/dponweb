@@ -59,7 +59,7 @@ class Helpers {
                 $user = User::where('phone', $phone)->first();
                 $data['block_status'] = $user->block_status;
             }
-            $date = Carbon::now()->format("Y-m-d");
+            $date = Carbon::now('Europe/London')->format("Y-m-d");
             $data['result'] = Helpers::get_result($date, $id);
 
             $marketDetails = MarketDetail::where('market_id', '=', $id)

@@ -91,12 +91,6 @@ class TransactionController extends Controller
     public function gamePassbookData() {
         if (request()->ajax()) {
             $user_id = Auth::user()->id;
-            $query = Passbook::select('markets.name as market_name', 'number', 'play_points', 'winning_points', 'total_points', 'session', 'passbook_date', 'transaction_type')
-                ->join('markets', 'passbooks.market_id', 'markets.id')
-                ->where('passbooks.user_id', $user_id)
-                ->where('passbooks.transaction_type', 'bid_play')
-                ->orWhere('passbooks.transaction_type', 'win')
-                ->orderBy('passbooks.id', 'DESC')->get();
             $query = Passbook::query()
                 ->select(
                     'markets.name as market_name',
