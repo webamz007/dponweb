@@ -2,8 +2,6 @@
 
 A comprehensive web-based numbers gaming platform that allows users to play numbers across different markets with real-time results and secure payment processing.
 
-🌐 **Live Demo:** [http://dponweb.com](http://dponweb.com)
-
 ## 📋 Overview
 
 DPOnWeb is a feature-rich gaming platform where users can participate in number-based games across various markets. The platform operates on scheduled market timings and provides a complete ecosystem for both players and administrators.
@@ -203,7 +201,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 📞 Support
 
 For support and inquiries:
-- **Website**: [http://dponweb.com](http://dponweb.com)
 - **Email**: websiteamz@gmail.com
 
 ---
